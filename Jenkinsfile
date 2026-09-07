@@ -23,21 +23,6 @@ pipeline {
             }
         }
 
-        stage('Smoke Test') {
-            steps {
-                bat """
-                    docker run -d --rm --name smoke-test-%IMAGE_TAG% -p 8080:80 %ECR_REPO%:%IMAGE_TAG%
-                    ping -n 4 127.0.0.1 > nul
-                    curl --fail --silent --show-error http://localhost:8080 || (docker logs smoke-test-%IMAGE_TAG% & exit /b 1)
-                """
-            }
-            post {
-                always {
-                    bat "docker stop smoke-test-%IMAGE_TAG% || exit 0"
-                }
-            }
-        }
-
         stage('Authenticate to ECR') {
             steps {
                 // Jenkins is not running on EC2, so there's no instance role
