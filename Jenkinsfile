@@ -19,7 +19,22 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
+                bat "docker build -t %ECR_REPO%:%IMAGE_TAG% ."
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                bat """
+                    docker run -d --rm --name smoke-test-%IMAGE_TAG% -p 8080:80 %ECR_REPO%:%IMAGE_TAG%
+                    ping -n 4 127.0.0.1 > nul
+                    curl --fail --silent --show-error http://localhost:8080 || (docker logs smoke-test-%IMAGE_TAG% & exit /b 1)
+                """
+            }
+            post {
+                always {
+                    bat "docker stop smoke-test-%IMAGE_TAG% || exit 0"
+                }
             }
         }
 
@@ -35,9 +50,10 @@ pipeline {
                 //   Kind: AWS Credentials
                 //   ID:   aws-ecr-creds
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
-                    sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ECR_URI}
+                    bat """
+                        aws ecr get-login-password --region %AWS_REGION% > password.txt
+                        type password.txt | docker login --username AWS --password-stdin %ECR_URI%
+                        del password.txt
                     """
                 }
             }
@@ -45,29 +61,29 @@ pipeline {
 
         stage('Tag Image') {
             steps {
-                sh "docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}"
-                sh "docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest"
+                bat "docker tag %ECR_REPO%:%IMAGE_TAG% %ECR_URI%:%IMAGE_TAG%"
+                bat "docker tag %ECR_REPO%:%IMAGE_TAG% %ECR_URI%:latest"
             }
         }
 
         stage('Push Image to ECR') {
             steps {
-                sh "docker push ${ECR_URI}:${IMAGE_TAG}"
-                sh "docker push ${ECR_URI}:latest"
+                bat "docker push %ECR_URI%:%IMAGE_TAG%"
+                bat "docker push %ECR_URI%:latest"
             }
         }
 
         stage('Verify Image in ECR') {
             steps {
-                sh "aws ecr describe-images --repository-name ${ECR_REPO} --region ${AWS_REGION} --image-ids imageTag=${IMAGE_TAG}"
+                bat "aws ecr describe-images --repository-name %ECR_REPO% --region %AWS_REGION% --image-ids imageTag=%IMAGE_TAG%"
             }
         }
     }
 
     post {
         always {
-            sh "docker rmi ${ECR_REPO}:${IMAGE_TAG} || true"
-            sh "docker logout ${ECR_URI} || true"
+            bat "docker rmi %ECR_REPO%:%IMAGE_TAG% || exit 0"
+            bat "docker logout %ECR_URI% || exit 0"
         }
         success {
             echo "Image pushed and verified: ${ECR_URI}:${IMAGE_TAG}"
