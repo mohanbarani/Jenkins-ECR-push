@@ -23,6 +23,22 @@ pipeline {
             }
         }
 
+        stage('Smoke Test') {
+            steps {
+                bat """
+                    docker rm -f smoke-test-%IMAGE_TAG% 2>nul || exit 0
+                    docker run -d --rm --name smoke-test-%IMAGE_TAG% -p 9090:80 %ECR_REPO%:%IMAGE_TAG%
+                    ping -n 4 127.0.0.1 > nul
+                    curl --fail --silent --show-error http://localhost:9090 || (docker logs smoke-test-%IMAGE_TAG% & exit /b 1)
+                """
+            }
+            post {
+                always {
+                    bat "docker stop smoke-test-%IMAGE_TAG% 2>nul || exit 0"
+                }
+            }
+        }
+
         stage('Authenticate to ECR') {
             steps {
                 // Jenkins is not running on EC2, so there's no instance role
@@ -60,7 +76,9 @@ pipeline {
 
         stage('Verify Image in ECR') {
             steps {
-                bat "aws ecr describe-images --repository-name %ECR_REPO% --region %AWS_REGION% --image-ids imageTag=%IMAGE_TAG%"
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
+                    bat "aws ecr describe-images --repository-name %ECR_REPO% --region %AWS_REGION% --image-ids imageTag=%IMAGE_TAG%"
+                }
             }
         }
     }
