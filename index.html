@@ -1,1 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jenkins ECR Training</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d0a1a;
+    --surface: #161228;
+    --surface-2: #1c1730;
+    --border: #2b2447;
+    --text: #e7ecf2;
+    --muted: #8a94a6;
+    --jenkins: #d24939;
+    --docker: #2c9fef;
+    --aws: #ff9900;
+    --success: #3ddc84;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body{
+    margin:0;
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, #221c3d 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: var(--display);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  a { color: inherit; }
+
+  :focus-visible {
+    outline: 2px solid var(--aws);
+    outline-offset: 3px;
+  }
+
+  .wrap{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- top status bar ---------- */
+  .topbar{
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+  }
+  .topbar .wrap{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    max-width: 980px;
+  }
+  .brand{
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  .brand b{ color: var(--text); font-weight: 600; }
+  .dots{ display:flex; gap:6px; }
+  .dot{ width:8px; height:8px; border-radius:50%; background: var(--border); }
+  .dot.on-jenkins{ background: var(--jenkins); }
+  .dot.on-docker{ background: var(--docker); }
+  .dot.on-aws{ background: var(--aws); }
+
+  /* ---------- hero ---------- */
+  .hero{
+    padding: 88px 0 56px;
+    text-align: center;
+  }
+  .hero .kicker{
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+  .hero .kicker .pipe{ color: var(--border); margin: 0 8px; }
+  .hero h1{
+    font-size: clamp(2.1rem, 5vw, 3.4rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+  }
+  .hero h1 .glow{
+    background: linear-gradient(100deg, var(--jenkins) 0%, var(--aws) 55%, var(--docker) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p{
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto 34px;
+  }
+
+  .run-btn{
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--bg);
+    background: var(--text);
+    border: none;
+    padding: 13px 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 0 0 0 rgba(61,220,132,0);
+  }
+  .run-btn:hover{ transform: translateY(-1px); }
+  .run-btn:active{ transform: translateY(0); }
+  .run-btn:disabled{
+    background: var(--surface-2);
+    color: var(--muted);
+    cursor: default;
+    transform: none;
+  }
+  .run-btn.success{
+    background: var(--success);
+    box-shadow: 0 0 24px 2px rgba(61,220,132,0.35);
+  }
+
+  /* ---------- pipeline diagram ---------- */
+  .pipeline{
+    padding: 8px 0 40px;
+  }
+  .pipeline-svg{ width: 100%; height: auto; display:block; }
+  .node-label{
+    font-family: var(--mono);
+    font-size: 11px;
+    fill: var(--muted);
+    text-anchor: middle;
+  }
+  .node-circle{
+    fill: var(--surface);
+    stroke: var(--border);
+    stroke-width: 1.5;
+    transition: stroke 0.3s ease, fill 0.3s ease;
+  }
+  .node-circle.active{ stroke: var(--aws); fill: var(--surface-2); }
+  .node-circle.done{ stroke: var(--success); }
+  .node-icon{ transition: opacity 0.3s ease; }
+  .track{
+    fill:none;
+    stroke: var(--border);
+    stroke-width: 2;
+  }
+  .track-fill{
+    fill:none;
+    stroke: var(--success);
+    stroke-width: 2;
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    transition: stroke-dashoffset 1.4s linear;
+  }
+  .packet{ opacity: 0; }
+  .packet.moving{ opacity: 1; }
+
+  /* ---------- terminal ---------- */
+  .terminal{
+    background: #0c1119;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 64px;
+  }
+  .terminal-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding: 11px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .terminal-bar .tdot{ width:10px; height:10px; border-radius:50%; background: var(--border); }
+  .terminal-title{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .terminal-body{
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 20px;
+    min-height: 220px;
+    max-height: 340px;
+    overflow-y: auto;
+    color: #c7d0dc;
+  }
+  .terminal-body .placeholder{ color: var(--muted); }
+  .term-line{ margin: 0 0 4px; white-space: pre-wrap; word-break: break-all; }
+  .term-line.cmd{ color: var(--text); }
+  .term-line.cmd::before{ content: "$ "; color: var(--success); }
+  .term-line.ok{ color: var(--success); }
+  .term-line.info{ color: var(--muted); }
+  .cursor{
+    display:inline-block;
+    width: 7px; height: 14px;
+    background: var(--text);
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink{ 50% { opacity: 0; } }
+
+  /* ---------- stat chips ---------- */
+  .chips{
+    display:flex;
+    gap: 12px;
+    justify-content:center;
+    flex-wrap: wrap;
+    padding-bottom: 72px;
+  }
+  .chip{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+  }
+  .chip b{ color: var(--text); font-weight: 600; }
+  .chip .sw{ width:7px; height:7px; border-radius:50%; }
+
+  /* ---------- confetti ---------- */
+  .confetti-piece{
+    position: fixed;
+    top: -10px;
+    width: 7px;
+    height: 7px;
+    z-index: 40;
+    pointer-events: none;
+    animation: fall linear forwards;
+  }
+  @keyframes fall{
+    to{ transform: translateY(110vh) rotate(540deg); opacity: 0.2; }
+  }
+
+  footer{
+    border-top: 1px solid var(--border);
+    padding: 22px 0 40px;
+    text-align: center;
+  }
+  footer p{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin:0;
+  }
+
+  @media (max-width: 640px){
+    .hero{ padding: 64px 0 40px; }
+    .terminal-body{ font-size: 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="wrap">
+      <div class="brand"><b>ecr-training</b> · session 01</div>
+      <div class="dots" aria-hidden="true">
+        <div class="dot on-jenkins"></div>
+        <div class="dot on-docker"></div>
+        <div class="dot on-aws"></div>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+
+    <section class="hero">
+      <p class="kicker">GITHUB<span class="pipe">/</span>DOCKER<span class="pipe">/</span>JENKINS<span class="pipe">/</span>ECR</p>
+      <h1>Welcome to <span class="glow">Jenkins ECR</span> Training</h1>
+      <p>Clone a repo, build a container, and ship it to a private registry — watch the whole pipeline run below.</p>
+      <button class="run-btn" id="runBtn">Run pipeline</button>
+    </section>
+
+    <section class="pipeline" aria-label="Pipeline stages">
+      <svg class="pipeline-svg" viewBox="0 0 860 160" xmlns="http://www.w3.org/2000/svg">
+        <path class="track" d="M 70 80 L 790 80" />
+        <path class="track-fill" id="trackFill" d="M 70 80 L 790 80" pathLength="1000" />
+
+        <!-- traveling packet -->
+        <g id="packet" class="packet">
+          <circle r="5" fill="#ffffff"/>
+          <animateMotion id="packetMotion" dur="7s" begin="indefinite" fill="freeze"
+            path="M 70 80 L 790 80" />
+        </g>
+
+        <!-- Node: GitHub -->
+        <g id="node-github">
+          <circle class="node-circle" cx="70" cy="80" r="26"/>
+          <path class="node-icon" transform="translate(58,68)" fill="none" stroke="#c7d0dc" stroke-width="1.6" d="M12 0C5.4 0 0 5.4 0 12c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11 11 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 24 12c0-6.6-5.4-12-12-12z"/>
+          <text class="node-label" x="70" y="122">GitHub</text>
+        </g>
+
+        <!-- Node: Jenkins -->
+        <g id="node-jenkins">
+          <circle class="node-circle" cx="250" cy="80" r="26"/>
+          <rect class="node-icon" x="238" y="68" width="24" height="24" rx="4" fill="none" stroke="#d24939" stroke-width="1.6"/>
+          <circle class="node-icon" cx="250" cy="80" r="6" fill="none" stroke="#d24939" stroke-width="1.6"/>
+          <text class="node-label" x="250" y="122">Jenkins</text>
+        </g>
+
+        <!-- Node: Docker build -->
+        <g id="node-docker">
+          <circle class="node-circle" cx="430" cy="80" r="26"/>
+          <g class="node-icon" transform="translate(415,72)" fill="none" stroke="#2c9fef" stroke-width="1.6">
+            <rect x="0" y="6" width="6" height="6"/>
+            <rect x="7" y="6" width="6" height="6"/>
+            <rect x="14" y="6" width="6" height="6"/>
+            <rect x="7" y="-1" width="6" height="6"/>
+            <path d="M -3 12 Q 10 20 23 12" />
+          </g>
+          <text class="node-label" x="430" y="122">Docker build</text>
+        </g>
+
+        <!-- Node: ECR auth + push -->
+        <g id="node-ecr-push">
+          <circle class="node-circle" cx="610" cy="80" r="26"/>
+          <path class="node-icon" transform="translate(597,68)" fill="none" stroke="#ff9900" stroke-width="1.6" d="M0 8 L12 0 L24 8 L24 16 L12 24 L0 16 Z M0 8 L12 16 M12 16 L24 8 M12 16 L12 24"/>
+          <text class="node-label" x="610" y="122">ECR auth · push</text>
+        </g>
+
+        <!-- Node: ECR registry -->
+        <g id="node-registry">
+          <circle class="node-circle" cx="790" cy="80" r="26"/>
+          <path class="node-icon" transform="translate(778,68)" fill="none" stroke="#8a94a6" stroke-width="1.6" d="M0 4 Q12 -2 24 4 L24 20 Q12 26 0 20 Z M0 4 Q12 10 24 4 M0 12 Q12 18 24 12"/>
+          <text class="node-label" x="790" y="122">ECR registry</text>
+        </g>
+      </svg>
+    </section>
+
+    <section class="terminal" aria-live="polite">
+      <div class="terminal-bar">
+        <div class="tdot" style="background:#d24939"></div>
+        <div class="tdot" style="background:#ff9900"></div>
+        <div class="tdot" style="background:#3ddc84"></div>
+        <span class="terminal-title">jenkins-agent — build #42</span>
+      </div>
+      <div class="terminal-body" id="termBody">
+        <p class="placeholder">Press "Run pipeline" to build and ship the image.<span class="cursor"></span></p>
+      </div>
+    </section>
+
+    <section class="chips">
+      <div class="chip"><span class="sw" style="background:var(--jenkins)"></span>13 steps end to end</div>
+      <div class="chip"><span class="sw" style="background:var(--docker)"></span>Docker + ECR</div>
+      <div class="chip"><span class="sw" style="background:var(--aws)"></span>IAM role auth, no static keys</div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>docker-jenkins-ecr-demo · training environment</p>
+  </footer>
+
+<script>
+(function(){
+  const runBtn = document.getElementById('runBtn');
+  const termBody = document.getElementById('termBody');
+  const trackFill = document.getElementById('trackFill');
+  const packetMotion = document.getElementById('packetMotion');
+  const packet = document.getElementById('packet');
+  const nodeIds = ['node-github','node-jenkins','node-docker','node-ecr-push','node-registry'];
+
+  const stages = [
+    {
+      node: 'node-github',
+      lines: [
+        { t: 'cmd', text: 'git clone https://github.com/you/docker-jenkins-ecr-demo.git' },
+        { t: 'info', text: "Cloning into 'docker-jenkins-ecr-demo'..." },
+        { t: 'ok', text: 'done.' }
+      ]
+    },
+    {
+      node: 'node-jenkins',
+      lines: [
+        { t: 'cmd', text: 'checkout scm  # Jenkinsfile detected' },
+        { t: 'info', text: 'Stage: Build Docker Image' }
+      ]
+    },
+    {
+      node: 'node-docker',
+      lines: [
+        { t: 'cmd', text: 'docker build -t docker-jenkins-ecr-demo:42 .' },
+        { t: 'info', text: 'Step 4/4 : CMD ["npm", "start"]' },
+        { t: 'ok', text: 'Successfully built 4f8a2c1d9e3b' }
+      ]
+    },
+    {
+      node: 'node-ecr-push',
+      lines: [
+        { t: 'cmd', text: 'aws ecr get-login-password | docker login --username AWS --password-stdin ...' },
+        { t: 'ok', text: 'Login Succeeded' },
+        { t: 'cmd', text: 'docker tag docker-jenkins-ecr-demo:42 ...amazonaws.com/docker-jenkins-ecr-demo:42' },
+        { t: 'cmd', text: 'docker push ...amazonaws.com/docker-jenkins-ecr-demo:42' },
+        { t: 'ok', text: 'digest: sha256:7e1c9a... size: 1988' }
+      ]
+    },
+    {
+      node: 'node-registry',
+      lines: [
+        { t: 'cmd', text: 'aws ecr describe-images --repository-name docker-jenkins-ecr-demo' },
+        { t: 'ok', text: '"imageTags": ["42", "latest"]  ✓ verified in ECR' }
+      ]
+    }
+  ];
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  function appendLine(line){
+    const p = document.createElement('p');
+    p.className = 'term-line ' + line.t;
+    p.textContent = line.text;
+    termBody.appendChild(p);
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+
+  function setNodeState(id, state){
+    const circle = document.querySelector('#' + id + ' .node-circle');
+    circle.classList.remove('active','done');
+    if (state) circle.classList.add(state);
+  }
+
+  function spawnConfetti(){
+    const colors = ['#d24939', '#ff9900', '#2c9fef', '#3ddc84'];
+    for (let i = 0; i < 40; i++){
+      const el = document.createElement('div');
+      el.className = 'confetti-piece';
+      el.style.left = Math.random() * 100 + 'vw';
+      el.style.background = colors[i % colors.length];
+      el.style.animationDuration = (2 + Math.random() * 1.5) + 's';
+      el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+  }
+
+  async function runPipeline(){
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+    runBtn.classList.remove('success');
+    termBody.innerHTML = '';
+    nodeIds.forEach(id => setNodeState(id, null));
+    trackFill.style.transition = 'none';
+    trackFill.style.strokeDashoffset = '1000';
+    void trackFill.offsetWidth;
+    trackFill.style.transition = 'stroke-dashoffset 1.4s linear';
+
+    packet.classList.add('moving');
+    packetMotion.setAttribute('dur', (stages.length * 1.4) + 's');
+    packetMotion.beginElement();
+
+    for (let i = 0; i < stages.length; i++){
+      const stage = stages[i];
+      setNodeState(stage.node, 'active');
+      const pct = ((i + 1) / stages.length) * 1000;
+      trackFill.style.strokeDashoffset = String(1000 - pct);
+
+      for (const line of stage.lines){
+        await sleep(320);
+        appendLine(line);
+      }
+      await sleep(280);
+      setNodeState(stage.node, 'done');
+    }
+
+    packet.classList.remove('moving');
+    runBtn.disabled = false;
+    runBtn.textContent = 'Pipeline succeeded ✓';
+    runBtn.classList.add('success');
+    spawnConfetti();
+  }
+
+  runBtn.addEventListener('click', runPipeline);
+})();
+</script>
+
+</body>
+</html>
 
